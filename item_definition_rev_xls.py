@@ -64,14 +64,15 @@ def create_review_sheet(wb, reviews):
     
     # Add data rows
     for row, review in enumerate(reviews, 2):
+        # Use placeholder text for empty fields
         data = [
             review.get('id', ''),
             review.get('category', ''),
             review.get('requirement', ''),
             review.get('description', ''),
-            review.get('status', ''),
-            review.get('comment', ''),
-            review.get('hint_for_improvement', '')
+            review.get('status', '') or '[To be filled]',
+            review.get('comment', '') or '[To be filled]',
+            review.get('hint_for_improvement', '') or '[To be filled]'
         ]
         
         for col, value in enumerate(data, 1):
@@ -79,8 +80,13 @@ def create_review_sheet(wb, reviews):
             cell.alignment = Alignment(vertical="top", wrap_text=True)
             cell.border = create_border()
             
-            # Color code status column
-            if col == 5:  # Status column
+            # Apply placeholder styling
+            if isinstance(value, str) and value.startswith('[To be filled'):
+                cell.font = Font(italic=True, color="808080")
+                cell.fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
+            
+            # Color code status column only if it has actual status
+            if col == 5 and value and not value.startswith('['):
                 apply_status_formatting(cell, value)
     
     # Auto-adjust column widths
@@ -89,6 +95,7 @@ def create_review_sheet(wb, reviews):
 def create_summary_sheet(wb, reviews):
     """
     Create summary statistics sheet.
+    For templates, shows instructions instead of statistics.
     
     Args:
         wb: openpyxl Workbook object
@@ -96,41 +103,63 @@ def create_summary_sheet(wb, reviews):
     """
     summary_ws = wb.create_sheet("Summary")
     
-    # Summary statistics
     total_items = len(reviews)
-    passed_items = len([r for r in reviews if r.get('status', '').lower() == 'pass'])
-    failed_items = len([r for r in reviews if r.get('status', '').lower() == 'fail'])
-    partial_items = len([r for r in reviews if 'partial' in r.get('status', '').lower()])
+    is_template = all(not review.get('status', '') for review in reviews)
     
-    summary_data = [
-        ["Review Summary", ""],
-        ["Generated on:", datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
-        ["Total Requirements Reviewed:", total_items],
-        ["Passed:", passed_items],
-        ["Failed:", failed_items],
-        ["Partially Passed:", partial_items],
-        ["Compliance Rate:", f"{(passed_items/total_items)*100:.1f}%" if total_items > 0 else "0%"],
-        ["", ""],
-        ["Status Distribution", "Count"],
-        ["Pass", passed_items],
-        ["Fail", failed_items],
-        ["Partial", partial_items]
-    ]
+    if is_template:
+        # Template mode
+        summary_data = [
+            ["Review Template Instructions", ""],
+            ["Total Requirements:", total_items],
+            ["", ""],
+            ["How to use this template:", ""],
+            ["1.", "Review each requirement against your Item Definition document"],
+            ["2.", "Fill in Status column with: Pass / Fail / Partial Pass / Not Applicable"],
+            ["3.", "Provide specific comments explaining your assessment"],
+            ["4.", "Add improvement hints where applicable"],
+            ["5.", "Use the Summary sheet to track overall progress"],
+            ["", ""],
+            ["Status Options:", "Description"],
+            ["Pass", "Requirement fully met"],
+            ["Fail", "Requirement not met"],
+            ["Partial Pass", "Requirement partially met"],
+            ["Not Applicable", "Requirement does not apply to this item"]
+        ]
+    else:
+        # Normal review mode
+        passed_items = len([r for r in reviews if r.get('status', '').lower() == 'pass'])
+        failed_items = len([r for r in reviews if r.get('status', '').lower() == 'fail'])
+        partial_items = len([r for r in reviews if 'partial' in r.get('status', '').lower()])
+        
+        summary_data = [
+            ["Review Summary", ""],
+            ["Generated on:", datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+            ["Total Requirements Reviewed:", total_items],
+            ["Passed:", passed_items],
+            ["Failed:", failed_items],
+            ["Partially Passed:", partial_items],
+            ["Compliance Rate:", f"{(passed_items/total_items)*100:.1f}%" if total_items > 0 else "0%"],
+            ["", ""],
+            ["Status Distribution", "Count"],
+            ["Pass", passed_items],
+            ["Fail", failed_items],
+            ["Partial", partial_items]
+        ]
     
     for row, (label, value) in enumerate(summary_data, 1):
         summary_ws.cell(row=row, column=1, value=label)
         summary_ws.cell(row=row, column=2, value=value)
         
         # Style headers
-        if label in ["Review Summary", "Status Distribution"]:
+        if label in ["Review Summary", "Review Template Instructions", "Status Distribution", "How to use this template:", "Status Options:"]:
             summary_ws.cell(row=row, column=1).font = Font(bold=True, size=14)
-        elif label and value:
+        elif label and value and not str(label).startswith(("1.", "2.", "3.", "4.", "5.")):
             summary_ws.cell(row=row, column=1).font = Font(bold=True)
     
-    # Auto-adjust summary column widths
+    # Auto-adjust column widths
     for col in range(1, 3):
         column_letter = get_column_letter(col)
-        summary_ws.column_dimensions[column_letter].width = 25
+        summary_ws.column_dimensions[column_letter].width = 40 if col == 2 else 25
 
 def create_category_breakdown_sheet(wb, reviews):
     """

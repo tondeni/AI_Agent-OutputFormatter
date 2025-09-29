@@ -151,10 +151,20 @@ def create_custom_styles(doc, style_prefix="Custom"):
         body_style = doc.styles.add_style(f"{style_prefix}Body", 1)
         body_style.base_style = doc.styles["Normal"]
         body_style.font.name = "Calibri"
-        body_style.font.size = Pt(10)
+        body_style.font.size = Pt(11)
         body_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         body_style.paragraph_format.space_after = Pt(6)
         body_style.paragraph_format.line_spacing = 1.15
+
+        # Guidance label style (for templates)
+        guidance_style = doc.styles.add_style(f"{style_prefix}GuidanceLabel", 1)
+        guidance_style.base_style = doc.styles["Normal"]
+        guidance_style.font.name = "Calibri"
+        guidance_style.font.size = Pt(11)
+        guidance_style.font.bold = True
+        guidance_style.font.color.rgb = RGBColor(0, 102, 204)  # Blue
+        guidance_style.paragraph_format.space_before = Pt(6)
+        guidance_style.paragraph_format.space_after = Pt(3)
 
     except Exception as e:
         log.warning(f"Some styles may already exist: {e}")
@@ -288,6 +298,7 @@ def add_section_explanation(doc, category):
 def parse_markdown_content(content):
     """
     Parse markdown-style content for Item Definition documents.
+    Handles both actual definitions and templates with guidance.
     
     Args:
         content (str): Markdown-style content
@@ -302,17 +313,40 @@ def parse_markdown_content(content):
         stripped = line.strip()
         if not stripped:
             continue
-            
-        if stripped.startswith("# "):
+        
+        # Main title (single #)
+        if stripped.startswith("# ") and not stripped.startswith("## "):
             sections.append({"type": "title", "text": stripped[2:].strip()})
-        elif stripped.startswith("## "):
+        
+        # Heading 1 (##)
+        elif stripped.startswith("## ") and not stripped.startswith("### "):
             sections.append({"type": "heading1", "text": stripped[3:].strip()})
+        
+        # Heading 2 (###)
         elif stripped.startswith("### "):
             sections.append({"type": "heading2", "text": stripped[4:].strip()})
-        elif stripped.startswith("*") and stripped.endswith("*"):
+        
+        # Clause references (italic text with *)
+        elif stripped.startswith("*Clause:") and stripped.endswith("*"):
             sections.append({"type": "clause", "text": stripped[1:-1].strip()})
+        
+        # Bold labels (entire line is **Label:**)
+        elif stripped.startswith("**") and stripped.endswith("**") and ":" in stripped:
+            sections.append({"type": "bold_label", "text": stripped})
+        
+        # Other italic text (single * at start and end, entire line)
+        elif stripped.startswith("*") and stripped.endswith("*") and not stripped.startswith("**"):
+            sections.append({"type": "italic", "text": stripped})
+        
+        # Horizontal rule
+        elif stripped == "---":
+            sections.append({"type": "separator", "text": stripped})
+        
+        # Bullet points
         elif stripped.startswith("- ") or stripped.startswith("* "):
             sections.append({"type": "bullet", "text": stripped[2:].strip()})
+        
+        # Regular text (may contain inline bold/italic)
         else:
             sections.append({"type": "body", "text": stripped})
     

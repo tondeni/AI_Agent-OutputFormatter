@@ -46,7 +46,7 @@ def before_cat_sends_message(message, cat):
             if filename:
                 doc_type_str = "Template" if is_template else "Item Definition"
                 folder_name = "templates" if is_template else "item_definition_work_product"
-                message["content"] += f"\n\n📄 *{doc_type_str} saved:* `{folder_name}/{filename}`"
+                message.content += f"\n\n📄 *{doc_type_str} saved:* `{folder_name}/{filename}`"
                 log.info(f"✅ {doc_type_str} formatted: {filename}")
         
         elif doc_type == "item_definition_review":
@@ -125,7 +125,6 @@ def extract_system_name(content):
         return first_line.split(": ", 1)[1].strip()
     
     return "Unknown System"
-
 
 def cleanup_working_memory(working_memory):
     """Clean up working memory keys used for document formatting."""

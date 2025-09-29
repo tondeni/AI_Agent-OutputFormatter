@@ -51,37 +51,60 @@ def create_review_docx(reviews, plugin_folder, timestamp):
 def create_summary_section(doc, reviews):
     """
     Create summary section with statistics.
+    For templates, shows structure without calculations.
     
     Args:
         doc: python-docx Document object
         reviews (list): List of review items
     """
     total_items = len(reviews)
-    passed_items = len([r for r in reviews if r.get('status', '').lower() == 'pass'])
-    failed_items = len([r for r in reviews if r.get('status', '').lower() == 'fail'])
-    partial_items = len([r for r in reviews if 'partial' in r.get('status', '').lower()])
     
-    doc.add_paragraph("Review Summary", style="ReviewHeader")
-    summary_table = doc.add_table(rows=5, cols=2)
-    summary_table.style = 'Table Grid'
-    summary_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    # Check if this is a template (empty status fields)
+    is_template = all(not review.get('status', '') for review in reviews)
     
-    summary_data = [
-        ("Total Requirements Reviewed:", str(total_items)),
-        ("Passed:", str(passed_items)),
-        ("Failed:", str(failed_items)),
-        ("Partially Passed:", str(partial_items)),
-        ("Compliance Rate:", f"{(passed_items/total_items)*100:.1f}%" if total_items > 0 else "0%")
-    ]
-    
-    for i, (label, value) in enumerate(summary_data):
-        summary_table.rows[i].cells[0].text = label
-        summary_table.rows[i].cells[1].text = value
-        # Style the cells
-        for cell in summary_table.rows[i].cells:
-            cell.paragraphs[0].runs[0].font.size = Pt(10)
-            if i == len(summary_data) - 1:  # Last row (compliance rate)
-                cell.paragraphs[0].runs[0].font.bold = True
+    if is_template:
+        # Template mode - no statistics
+        doc.add_paragraph("Review Summary", style="ReviewHeader")
+        summary_table = doc.add_table(rows=2, cols=2)
+        summary_table.style = 'Table Grid'
+        summary_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        
+        summary_table.rows[0].cells[0].text = "Total Requirements to Review:"
+        summary_table.rows[0].cells[1].text = str(total_items)
+        summary_table.rows[1].cells[0].text = "Template Status:"
+        summary_table.rows[1].cells[1].text = "Ready for review"
+        
+        for i in range(2):
+            for cell in summary_table.rows[i].cells:
+                cell.paragraphs[0].runs[0].font.size = Pt(10)
+                if i == 0:
+                    cell.paragraphs[0].runs[0].font.bold = True
+    else:
+        # Normal review mode - calculate statistics
+        passed_items = len([r for r in reviews if r.get('status', '').lower() == 'pass'])
+        failed_items = len([r for r in reviews if r.get('status', '').lower() == 'fail'])
+        partial_items = len([r for r in reviews if 'partial' in r.get('status', '').lower()])
+        
+        doc.add_paragraph("Review Summary", style="ReviewHeader")
+        summary_table = doc.add_table(rows=5, cols=2)
+        summary_table.style = 'Table Grid'
+        summary_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        
+        summary_data = [
+            ("Total Requirements Reviewed:", str(total_items)),
+            ("Passed:", str(passed_items)),
+            ("Failed:", str(failed_items)),
+            ("Partially Passed:", str(partial_items)),
+            ("Compliance Rate:", f"{(passed_items/total_items)*100:.1f}%" if total_items > 0 else "0%")
+        ]
+        
+        for i, (label, value) in enumerate(summary_data):
+            summary_table.rows[i].cells[0].text = label
+            summary_table.rows[i].cells[1].text = value
+            for cell in summary_table.rows[i].cells:
+                cell.paragraphs[0].runs[0].font.size = Pt(10)
+                if i == len(summary_data) - 1:
+                    cell.paragraphs[0].runs[0].font.bold = True
 
 def create_detailed_results_section(doc, categorized_reviews):
     """
@@ -132,9 +155,9 @@ def create_review_item_table(doc, review, category, item_number):
         ("ID:", review.get('id', 'N/A')),
         ("Requirement:", review.get('requirement', 'N/A')),
         ("Description:", review.get('description', 'N/A')),
-        ("Status:", review.get('status', 'N/A')),
-        ("Comment:", review.get('comment', 'N/A')),
-        ("Hint for Improvement:", review.get('hint_for_improvement', 'N/A'))
+        ("Status:", review.get('status', '') or '[To be filled by reviewer]'),
+        ("Comment:", review.get('comment', '') or '[To be filled by reviewer]'),
+        ("Hint for Improvement:", review.get('hint_for_improvement', '') or '[To be filled by reviewer]')
     ]
     
     for j, (field_name, field_value) in enumerate(fields):
@@ -146,12 +169,17 @@ def create_review_item_table(doc, review, category, item_number):
         table.rows[j].cells[0].paragraphs[0].runs[0].font.size = Pt(10)
         table.rows[j].cells[1].paragraphs[0].runs[0].font.size = Pt(10)
         
-        # Color code status
-        if field_name == "Status:":
+        # Apply placeholder styling for empty fields
+        if field_value.startswith('[To be filled'):
+            table.rows[j].cells[1].paragraphs[0].runs[0].font.italic = True
+            table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(128, 128, 128)
+        
+        # Color code status only if it has a value
+        if field_name == "Status:" and field_value and not field_value.startswith('['):
             status_lower = field_value.lower()
             if 'pass' in status_lower and 'fail' not in status_lower:
-                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(0, 128, 0)  # Green
+                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(0, 128, 0)
             elif 'fail' in status_lower:
-                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 0, 0)  # Red
+                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 0, 0)
             elif 'partial' in status_lower:
-                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 165, 0)  # Orange
+                table.rows[j].cells[1].paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 165, 0)
