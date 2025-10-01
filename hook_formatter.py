@@ -31,11 +31,11 @@ def before_cat_sends_message(message, cat):
         
         # Determine output directory based on type
         if is_template:
-            output_dir = os.path.join(plugin_folder, "generated_documents", "templates")
+            output_dir = os.path.join(plugin_folder, "generated_documents", "00_Templates")
         elif doc_type == "item_definition":
-            output_dir = os.path.join(plugin_folder, "generated_documents", "item_definition_work_product")
+            output_dir = os.path.join(plugin_folder, "generated_documents", "01_Item_Definition")
         elif doc_type == "item_definition_review":
-            output_dir = os.path.join(plugin_folder, "generated_documents", "item_definition_review_checklist_report")
+            output_dir = os.path.join(plugin_folder, "generated_documents", "02_Item_Definition_Review_Checklist_Report")
         
         # Create directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
