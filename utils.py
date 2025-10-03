@@ -18,14 +18,28 @@ def detect_document_type(content, working_memory):
         working_memory (dict): Cheshire Cat working memory
         
     Returns:
-        str: Document type ('item_definition', 'item_definition_review', or None)
+        str: Document type or None
     """
     # Check working memory first (most reliable)
     doc_type = working_memory.get("document_type")
+    hara_stage = working_memory.get("hara_stage", "")
+    
+    # CRITICAL: Only return HARA document types at appropriate stages
+    if doc_type == "hara":
+        if hara_stage not in ["table_generated", "safety_goals_derived"]:
+            return None  # Don't process incomplete HARA
+        return "hara"
+    
+    if doc_type == "safety_goals":
+        if hara_stage != "safety_goals_derived":
+            return None  # Don't process incomplete safety goals
+        return "safety_goals"
+    
+    # Check other document types
     if doc_type in ["item_definition", "item_definition_review"]:
         return doc_type
     
-    # Fallback to content analysis
+    # Fallback to content analysis (less reliable)
     if "# ISO 26262 Item Definition:" in content:
         return "item_definition"
     elif "**ID:**" in content and "**Status:**" in content:
