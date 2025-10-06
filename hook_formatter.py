@@ -52,6 +52,8 @@ def before_cat_sends_message(message, cat):
             output_dir = os.path.join(plugin_folder, "generated_documents", "03_HARA")
         elif doc_type == "safety_goals":
             output_dir = os.path.join(plugin_folder, "generated_documents", "04_Safety_Goals")
+        elif doc_type == "hara_review":
+            output_dir = os.path.join(plugin_folder, "generated_documents", "05_HARA_Review")
         else:
             return message  # Unknown type, skip
         
@@ -74,6 +76,16 @@ def before_cat_sends_message(message, cat):
                 file_list = "\n- ".join(filenames)
                 doc_type_str = "Review templates" if is_template else "Review documents"
                 folder_name = "00_Templates" if is_template else "02_Item_Definition_Review_Checklist_Report"
+                message["content"] += f"\n\n📄 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
+                log.info(f"✅ {doc_type_str} formatted: {filenames}")
+        
+        elif doc_type == "hara_review":
+            filenames = format_review(content, plugin_folder, output_dir, 
+                                    timestamp, is_template)
+            if filenames:
+                file_list = "\n- ".join(filenames)
+                doc_type_str = "HARA Review templates" if is_template else "HARA Review documents"
+                folder_name = "00_Templates" if is_template else "05_HARA_Review"
                 message["content"] += f"\n\n📄 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
                 log.info(f"✅ {doc_type_str} formatted: {filenames}")
         
@@ -136,16 +148,24 @@ def format_review(content, plugin_folder, output_dir, timestamp, is_template=Fal
         filenames = []
         prefix = "TEMPLATE_" if is_template else ""
         
+        # Determine if this is HARA review or Item Definition review
+        is_hara_review = any("REV_HARA_" in review.get('id', '') for review in reviews[:5])
+        
+        if is_hara_review:
+            base_name = "HARA_Review"
+        else:
+            base_name = "ItemDefinition_Review"
+        
         # Create Word document
         doc = create_review_docx(reviews, plugin_folder, timestamp)
-        docx_filename = f"{prefix}ItemDefinition_Review_{timestamp}.docx"
+        docx_filename = f"{prefix}{base_name}_{timestamp}.docx"
         docx_path = os.path.join(output_dir, docx_filename)
         doc.save(docx_path)
         filenames.append(f"Word: {docx_filename}")
         
         # Create Excel file
         wb = create_review_excel(reviews, timestamp)
-        excel_filename = f"{prefix}ItemDefinition_Review_{timestamp}.xlsx"
+        excel_filename = f"{prefix}{base_name}_{timestamp}.xlsx"
         excel_path = os.path.join(output_dir, excel_filename)
         wb.save(excel_path)
         filenames.append(f"Excel: {excel_filename}")
@@ -178,7 +198,7 @@ def format_hara_table(content, plugin_folder, output_dir, timestamp, working_mem
         filepath = os.path.join(output_dir, filename)
         
         # Create Excel workbook
-        wb = create_hara_excel(hara_table, hazop_analysis, exposure_assessments, item_name, timestamp)
+        wb = create_hara_excel(hara_table, item_name, timestamp)
         wb.save(filepath)
         
         return [f"Excel: {filename}"]
@@ -235,8 +255,16 @@ def extract_system_name(content):
 
 def cleanup_working_memory(working_memory):
     """Clean up working memory keys used for document formatting."""
-    # Don't cleanup hara_stage - needed for workflow progression
-    keys_to_remove = ["document_type", "is_template"]
-    for key in keys_to_remove:
+    keys_to_clean = [
+        "document_type",
+        "reviewed_item",
+        "is_template",
+        "hara_table",
+        "hazop_analysis",
+        "exposure_assessments",
+        "safety_goals_document"
+    ]
+    
+    for key in keys_to_clean:
         if key in working_memory:
             del working_memory[key]
