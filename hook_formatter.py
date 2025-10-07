@@ -7,6 +7,7 @@ from .item_definition_dev_doc import create_item_definition_docx
 from .item_definition_rev_doc import create_review_docx
 from .item_definition_rev_xls import create_review_excel
 from .hara_dev_xls import create_hara_excel
+from .fsr_formatter_xls import create_fsr_excel, parse_fsrs
 from .utils import parse_review_content, detect_document_type
 
 @hook(priority=1)
@@ -85,8 +86,8 @@ def before_cat_sends_message(message, cat):
             output_dir = os.path.join(plugin_folder, "generated_documents", "04_HARA_Review_Checklist_Report")
         elif doc_type == "safety_goals":
             output_dir = os.path.join(plugin_folder, "generated_documents", "05_Safety_Goals")
-        else:
-            return message  # Unknown type, skip
+        elif doc_type == "fsr":
+            output_dir = os.path.join(plugin_folder, "generated_documents", "06_Functional Safety Requirements")
         
         # Create directory if it doesn't exist
         os.makedirs(output_dir, exist_ok=True)
@@ -137,6 +138,16 @@ def before_cat_sends_message(message, cat):
                 file_list = "\n- ".join(filenames)
                 message["content"] += f"\n\n📋 *Safety Goals documents generated in `generated_documents/04_Safety_Goals/`:*\n- {file_list}"
                 log.info(f"✅ Safety Goals formatted: {filenames}")
+
+        elif doc_type == "fsr":
+            filenames = format_fsr_document(content, plugin_folder, output_dir, 
+                                            timestamp, cat.working_memory)
+            if filenames:
+                file_list = "\n- ".join(filenames)
+                doc_type_str = "FSR templates" if is_template else "Functional Safety Requirements"
+                folder_name = "00_Templates" if is_template else "06_Functional Safety Requirements"
+                message["content"] += f"\n\n📊 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
+                log.info(f"✅ {doc_type_str} formatted: {filenames}")
         
         cleanup_working_memory(cat.working_memory)
         
@@ -287,6 +298,49 @@ def format_safety_goals(content, plugin_folder, output_dir, timestamp, working_m
         return None
     except Exception as e:
         log.error(f"Safety Goals formatting error: {e}")
+        return None
+
+def format_fsr_document(content, plugin_folder, output_dir, timestamp, working_memory):
+    """Format FSR document into Excel file."""
+    try:
+        # Get FSRs from working memory if available
+        fsrs = working_memory.get("fsc_functional_requirements", [])
+        
+        # If not in memory, try to parse from content
+        if not fsrs:
+            log.info("Parsing FSRs from content text")
+            fsrs = parse_fsrs(content)
+        
+        if not fsrs:
+            log.warning("No FSRs found to format")
+            return None
+        
+        system_name = working_memory.get("system_name", "Unknown_System")
+        safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
+                           for c in system_name).replace(" ", "_")
+        
+        filename = f"FSR_{safe_name}_{timestamp}.xlsx"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Create Excel workbook
+        wb = create_fsr_excel(fsrs, system_name, timestamp)
+        
+        if wb is None:
+            log.warning("Excel workbook creation returned None")
+            return None
+        
+        wb.save(filepath)
+        log.info(f"FSR Excel saved: {filepath}")
+        
+        return [f"Excel: {filename}"]
+        
+    except ImportError as e:
+        log.warning(f"FSR Excel formatter import error: {e}")
+        return None
+    except Exception as e:
+        log.error(f"FSR formatting error: {e}")
+        import traceback
+        log.error(traceback.format_exc())
         return None
 
 

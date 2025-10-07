@@ -88,6 +88,17 @@ def detect_document_type(content, working_memory):
         log.info("📌 Detected safety goals from content and stage")
         return "safety_goals"
     
+    # Check for FSR document
+    if any(marker in content for marker in [
+        "Functional Safety Requirements",
+        "FSR-",
+        "**FSR-",
+        "7.4.2.1",
+        "7.4.2.2"
+        ]) and "derived" in content.lower():
+        log.info("📌 Detected FSR document from content markers")
+        return "fsr"
+    
     # No clear type detected
     log.info("📌 No specific document type detected")
     return None
