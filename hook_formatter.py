@@ -17,7 +17,38 @@ def before_cat_sends_message(message, cat):
     
     CRITICAL: Only formats complete documents, not intermediate workflow steps.
     """
+
     content = message.get("content", "")
+    # # ADD DEBUG HERE
+    # log.info("=" * 50)
+    # log.info("🎣 HOOK TRIGGERED: before_cat_sends_message")
+    # log.info(f"📌 Working memory keys: {list(cat.working_memory.keys())}")
+    # log.info(f"📌 hara_stage: {cat.working_memory.get('hara_stage', 'NOT SET')}")
+    # log.info(f"📌 document_type: {cat.working_memory.get('document_type', 'NOT SET')}")
+    # log.info(f"📌 hara_table exists: {bool(cat.working_memory.get('hara_table', ''))}")
+    # log.info("=" * 50)
+    
+    # Detect document type from content or working memory
+    doc_type = detect_document_type(content, cat.working_memory)
+    log.info(f"📌 Detected doc_type: {doc_type}")
+    
+    # CRITICAL: Check HARA workflow stage before attempting to format
+    hara_stage = cat.working_memory.get("hara_stage", "")
+    log.info(f"📌 HARA stage for check: {hara_stage}")
+    
+    doc_type = detect_document_type(content, cat.working_memory)
+    log.info(f"Detected document type: {doc_type}")
+    
+    hara_stage = cat.working_memory.get("hara_stage", "")
+    log.info(f"HARA stage: {hara_stage}")
+    
+    if doc_type == "hara":
+        log.info(f"HARA detected - checking stage: {hara_stage}")
+        if hara_stage not in ["table_generated", "safety_goals_derived"]:
+            log.info(f"HARA workflow incomplete (stage: {hara_stage}). Skipping.")
+            return message
+        else:
+            log.info(f"HARA stage is {hara_stage} - proceeding with formatting")
     
     # Detect document type from content or working memory
     doc_type = detect_document_type(content, cat.working_memory)
@@ -50,10 +81,10 @@ def before_cat_sends_message(message, cat):
             output_dir = os.path.join(plugin_folder, "generated_documents", "02_Item_Definition_Review_Checklist_Report")
         elif doc_type == "hara":
             output_dir = os.path.join(plugin_folder, "generated_documents", "03_HARA")
-        elif doc_type == "safety_goals":
-            output_dir = os.path.join(plugin_folder, "generated_documents", "04_Safety_Goals")
         elif doc_type == "hara_review":
-            output_dir = os.path.join(plugin_folder, "generated_documents", "05_HARA_Review")
+            output_dir = os.path.join(plugin_folder, "generated_documents", "04_HARA_Review_Checklist_Report")
+        elif doc_type == "safety_goals":
+            output_dir = os.path.join(plugin_folder, "generated_documents", "05_Safety_Goals")
         else:
             return message  # Unknown type, skip
         
@@ -79,16 +110,6 @@ def before_cat_sends_message(message, cat):
                 message["content"] += f"\n\n📄 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
                 log.info(f"✅ {doc_type_str} formatted: {filenames}")
         
-        elif doc_type == "hara_review":
-            filenames = format_review(content, plugin_folder, output_dir, 
-                                    timestamp, is_template)
-            if filenames:
-                file_list = "\n- ".join(filenames)
-                doc_type_str = "HARA Review templates" if is_template else "HARA Review documents"
-                folder_name = "00_Templates" if is_template else "05_HARA_Review"
-                message["content"] += f"\n\n📄 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
-                log.info(f"✅ {doc_type_str} formatted: {filenames}")
-        
         elif doc_type == "hara" and hara_stage == "table_generated":
             # Only format HARA after Step 4 is complete
             filenames = format_hara_table(content, plugin_folder, output_dir, 
@@ -96,8 +117,18 @@ def before_cat_sends_message(message, cat):
             if filenames:
                 file_list = "\n- ".join(filenames)
                 message["content"] += f"\n\n📊 *HARA documents generated in `generated_documents/03_HARA/`:*\n- {file_list}"
-                log.info(f"✅ HARA formatted: {filenames}")
+                log.info(f"✅ HARA formatted: {filenames}")        
         
+        elif doc_type == "hara_review":
+            filenames = format_review(content, plugin_folder, output_dir, 
+                                    timestamp, is_template)
+            if filenames:
+                file_list = "\n- ".join(filenames)
+                doc_type_str = "HARA Review templates" if is_template else "HARA Review documents"
+                folder_name = "00_Templates" if is_template else "04_HARA_Review_Checklist_Report"
+                message["content"] += f"\n\n📄 *{doc_type_str} generated in `generated_documents/{folder_name}/`:*\n- {file_list}"
+                log.info(f"✅ {doc_type_str} formatted: {filenames}")
+               
         elif doc_type == "safety_goals" and hara_stage == "safety_goals_derived":
             # Only format safety goals after Step 5 is complete
             filenames = format_safety_goals(content, plugin_folder, output_dir,
@@ -179,17 +210,25 @@ def format_review(content, plugin_folder, output_dir, timestamp, is_template=Fal
 def format_hara_table(content, plugin_folder, output_dir, timestamp, working_memory):
     """Format HARA table into Excel workbook."""
     try:
-        # Import HARA formatters (create these if they don't exist)
-        from .hara_dev_xls import create_hara_excel
+        # Import HARA formatters
+        from .hara_dev_xls import create_hara_excel, parse_hara_table  # Add parse_hara_table
         
         hara_table = working_memory.get("hara_table", "")
-        hazop_analysis = working_memory.get("hazop_analysis", "")
-        exposure_assessments = working_memory.get("exposure_assessments", "")
         item_name = working_memory.get("hara_item_name", "Unknown_System")
         
         if not hara_table:
             log.warning("No HARA table found in working memory")
             return None
+        
+        # CRITICAL FIX: Parse the table before creating Excel
+        hara_entries = parse_hara_table(hara_table)
+        
+        if not hara_entries:
+            log.warning("No HARA entries parsed from table")
+            log.debug(f"Raw table content: {hara_table[:500]}")  # Log first 500 chars
+            return None
+        
+        log.info(f"Parsed {len(hara_entries)} HARA entries")
         
         safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
                            for c in item_name).replace(" ", "_")
@@ -197,16 +236,25 @@ def format_hara_table(content, plugin_folder, output_dir, timestamp, working_mem
         filename = f"HARA_{safe_name}_{timestamp}.xlsx"
         filepath = os.path.join(output_dir, filename)
         
-        # Create Excel workbook
-        wb = create_hara_excel(hara_table, item_name, timestamp)
+        # Create Excel workbook with PARSED entries
+        wb = create_hara_excel(hara_entries, item_name, timestamp)  # Changed parameter
+        
+        if wb is None:
+            log.warning("Excel workbook creation returned None (openpyxl not available?)")
+            return None
+        
         wb.save(filepath)
+        log.info(f"HARA Excel saved: {filepath}")
         
         return [f"Excel: {filename}"]
-    except ImportError:
-        log.warning("HARA Excel formatter not available yet")
+        
+    except ImportError as e:
+        log.warning(f"HARA Excel formatter import error: {e}")
         return None
     except Exception as e:
         log.error(f"HARA formatting error: {e}")
+        import traceback
+        log.error(traceback.format_exc())  # Add full traceback
         return None
 
 

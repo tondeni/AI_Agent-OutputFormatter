@@ -11,71 +11,140 @@ from cat.log import log
 
 def detect_document_type(content, working_memory):
     """
-    Detect the type of document based on content patterns and working memory.
+    Detect document type from content and working memory.
+    PRIORITY: Check working memory first, then content markers.
     
     Args:
-        content (str): The LLM output content
-        working_memory (dict): Cheshire Cat working memory
+        content (str): Document content
+        working_memory (dict): Cat's working memory
         
     Returns:
-        str: Document type or None
+        str: Document type identifier or None
     """
-    # Check working memory first (most reliable)
+    
+    # CRITICAL FIX: Check working memory FIRST - this is the most reliable
     doc_type = working_memory.get("document_type")
-    hara_stage = working_memory.get("hara_stage", "")
     
-    # CRITICAL: Only return HARA document types at appropriate stages
-    if doc_type == "hara":
-        if hara_stage not in ["table_generated", "safety_goals_derived"]:
-            return None  # Don't process incomplete HARA
-        return "hara"
-    
-    if doc_type == "safety_goals":
-        if hara_stage != "safety_goals_derived":
-            return None  # Don't process incomplete safety goals
-        return "safety_goals"
-    
-    # Check other document types
-    if doc_type in ["item_definition", "item_definition_review"]:
+    if doc_type:
+        log.info(f"📌 Document type from working memory: {doc_type}")
+        
+        # Additional check for HARA review to avoid confusion
+        review_type = working_memory.get("review_type")
+        if review_type == "HARA_COMPLIANCE":
+            log.info("📌 Confirmed HARA review via review_type marker")
+            return "hara_review"
+        
         return doc_type
     
-    # Fallback to content analysis (less reliable)
-    if "# ISO 26262 Item Definition:" in content:
-        return "item_definition"
-    elif "**ID:**" in content and "**Status:**" in content:
+    # FALLBACK: Check content patterns if working memory doesn't have explicit type
+    content_lower = content.lower()
+    
+    # Check for HARA REVIEW first (most specific)
+    if any(marker in content for marker in [
+        "# HARA COMPLIANCE REVIEW REPORT",
+        "HARA Review per ISO 26262-3",
+        "HARA_COMPLIANCE"
+    ]):
+        log.info("📌 Detected HARA review from content markers")
+        return "hara_review"
+    
+    # Check for HARA-specific patterns in content
+    if "hara" in content_lower and any(marker in content_lower for marker in [
+        "hazard analysis and risk assessment",
+        "asil determination",
+        "severity", "exposure", "controllability",
+        "hazardous event"
+    ]):
+        # Check if this is a review or the HARA itself
+        if any(review_marker in content_lower for review_marker in [
+            "**status:**", "**comment:**", "**hint for improvement:**",
+            "pass / fail", "review checklist"
+        ]):
+            log.info("📌 Detected HARA review from content patterns")
+            return "hara_review"
+        else:
+            log.info("📌 Detected HARA document from content patterns")
+            return "hara"
+    
+    # Check for Item Definition Review (less specific, check after HARA review)
+    if "item definition" in content_lower and any(marker in content_lower for marker in [
+        "**status:**", "**comment:**", "**hint for improvement:**",
+        "iso 26262-3 clause 5"
+    ]):
+        log.info("📌 Detected item definition review from content patterns")
         return "item_definition_review"
     
+    # Check for Item Definition
+    if any(marker in content for marker in [
+        "# Item Definition:",
+        "## Item Definition Document",
+        "### Item Description"
+    ]):
+        log.info("📌 Detected item definition from content markers")
+        return "item_definition"
+    
+    # Check for Safety Goals
+    if "safety goal" in content_lower and working_memory.get("hara_stage") == "safety_goals_derived":
+        log.info("📌 Detected safety goals from content and stage")
+        return "safety_goals"
+    
+    # No clear type detected
+    log.info("📌 No specific document type detected")
     return None
 
 def parse_review_content(content):
     """
-    Parse LLM review response into structured data.
+    Parse review content into structured review items.
     
     Args:
-        content (str): Raw LLM review output
+        content (str): Raw review content with markdown formatting
         
     Returns:
-        list: List of review items with structured fields
+        list: List of review item dictionaries
     """
     reviews = []
+    current_review = {}
     
-    # Find all blocks that start with **ID:** and capture until next **ID:** or end
-    blocks = re.findall(r'\*\*ID:\*\*.*?(?=\*\*ID:\*\*|\Z)', content, re.DOTALL)
+    # Split by common separators
+    sections = re.split(r'\n\s*---\s*\n|\n\s*={3,}\s*\n', content)
     
-    for block in blocks:
-        review = {}
-        fields = ['ID', 'Category', 'Requirement', 'Description', 'Status', 'Comment', 'Hint for improvement']
+    for section in sections:
+        lines = section.strip().split('\n')
         
-        for field in fields:
-            # Escape field name for regex (handles spaces and special chars)
-            pattern = rf'\*\*{re.escape(field)}:\*\*\s*(.*?)(?=\*\*|\Z)'
-            match = re.search(pattern, block, re.DOTALL | re.IGNORECASE)
+        for line in lines:
+            line = line.strip()
             
-            field_key = field.lower().replace(' ', '_')
-            review[field_key] = match.group(1).strip() if match else "N/A"
-        
-        if review.get("id") != "N/A":
-            reviews.append(review)
+            # Look for review fields
+            if line.startswith('**ID:**'):
+                # Save previous review if exists
+                if current_review:
+                    reviews.append(current_review)
+                current_review = {'id': line.replace('**ID:**', '').strip()}
+                
+            elif line.startswith('**Category:**') and current_review:
+                current_review['category'] = line.replace('**Category:**', '').strip()
+                
+            elif line.startswith('**Requirement:**') and current_review:
+                current_review['requirement'] = line.replace('**Requirement:**', '').strip()
+                
+            elif line.startswith('**Description:**') and current_review:
+                current_review['description'] = line.replace('**Description:**', '').strip()
+                
+            elif line.startswith('**ISO Clause:**') and current_review:
+                current_review['iso_clause'] = line.replace('**ISO Clause:**', '').strip()
+                
+            elif line.startswith('**Status:**') and current_review:
+                current_review['status'] = line.replace('**Status:**', '').strip()
+                
+            elif line.startswith('**Comment:**') and current_review:
+                current_review['comment'] = line.replace('**Comment:**', '').strip()
+                
+            elif line.startswith('**Hint for improvement:**') and current_review:
+                current_review['hint'] = line.replace('**Hint for improvement:**', '').strip()
+    
+    # Add last review
+    if current_review:
+        reviews.append(current_review)
     
     log.info(f"Parsed {len(reviews)} review items from content")
     return reviews
