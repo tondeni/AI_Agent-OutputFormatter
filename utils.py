@@ -151,7 +151,7 @@ def parse_review_content(content):
                 current_review['comment'] = line.replace('**Comment:**', '').strip()
                 
             elif line.startswith('**Hint for improvement:**') and current_review:
-                current_review['hint'] = line.replace('**Hint for improvement:**', '').strip()
+                current_review['hint_for_improvement'] = line.replace('**Hint for improvement:**', '').strip()
     
     # Add last review
     if current_review:
