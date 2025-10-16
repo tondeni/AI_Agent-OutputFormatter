@@ -1,121 +1,27 @@
 # ==============================================================================
-# fsc_file_tools.py (NEW FILE)
-# Tools for FSC file generation (Excel and Word)
-# Place in: AI_Agent-OutputFormatter/fsc_file_tools.py
+# code/tools/fsc_file_tools.py
+# Tools for FSC file generation - Fixed imports for your folder structure
 # ==============================================================================
 
 from cat.mad_hatter.decorators import tool
 from cat.log import log
 import os
+import sys
 from datetime import datetime
 
+# Get current file location
+current_file = os.path.abspath(__file__)
 
-@tool(return_direct=True)
-def create_excel_file(tool_input, cat):
-    """
-    Generate Excel file with FSC data (FSRs, allocation matrix, traceability).
-    
-    Creates a comprehensive Excel workbook with multiple sheets:
-    - FSRs listing
-    - Allocation matrix
-    - Traceability to safety goals
-    - Statistics and summaries
-    
-    Examples: 
-    - "create excel file"
-    - "generate excel spreadsheet"
-    - "export FSRs to excel"
-    """
-    
-    log.info("✅ TOOL CALLED: create_excel_file")
-    
-    fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
-    system_name = cat.working_memory.get("system_name", "System")
-    
-    if not fsrs_data:
-        return """❌ No FSC data available to export.
+# Go up the folder tree
+tools_folder = os.path.dirname(current_file)           # code/tools/
+code_folder = os.path.dirname(tools_folder)            # code/
+plugin_folder = os.path.dirname(code_folder)           # Plugin folder/
 
-**Required:** Derive FSRs first using: `derive FSRs for all goals`
-
-Then you can generate Excel files with the FSC data."""
-    
-    try:
-        # Import Excel generator
-        from .fsr_excel_generator import generate_fsr_excel
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        plugin_folder = os.path.dirname(__file__)
-        output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSC")
-        os.makedirs(output_dir, exist_ok=True)
-        
-        # Sanitize system name for filename
-        safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
-                           for c in system_name).replace(" ", "_")
-        
-        filename = f"FSC_{safe_name}_{timestamp}.xlsx"
-        filepath = os.path.join(output_dir, filename)
-        
-        # Create Excel workbook
-        log.info(f"📊 Generating Excel file: {filename}")
-        wb = generate_fsr_excel(fsrs_data, system_name)
-        wb.save(filepath)
-        
-        # Calculate statistics
-        allocated = sum(1 for f in fsrs_data if f.get('allocated_to'))
-        by_asil = {}
-        for f in fsrs_data:
-            asil = f.get('asil', 'QM')
-            by_asil[asil] = by_asil.get(asil, 0) + 1
-        
-        asil_summary = ', '.join([f"ASIL {asil}: {count}" for asil, count in sorted(by_asil.items(), reverse=True)])
-        
-        return f"""✅ **Excel file generated successfully!**
-
-**File:** `{filename}`
-**Location:** `generated_documents/06_FSC/`
-
-**Contents:**
-- 📋 **FSRs Sheet**: {len(fsrs_data)} Functional Safety Requirements
-- 🗂️ **Allocation Matrix**: {allocated}/{len(fsrs_data)} FSRs allocated
-- 🔗 **Traceability**: FSR → Safety Goal mapping
-- 📊 **Statistics**: Distribution by ASIL and type
-
-**ASIL Distribution:** {asil_summary}
-
-**Worksheets:**
-1. FSRs - Complete listing with all details
-2. Allocation Matrix - FSRs grouped by component
-3. Traceability - Mapping to safety goals
-4. Statistics - Summary and charts
-
-The file is ready for review and can be shared with your safety team.
-"""
-        
-    except ImportError as e:
-        log.error(f"❌ Import error: {e}")
-        return f"""❌ Excel generator not available.
-
-**Error:** {str(e)}
-
-**Solution:** Ensure the FSR Excel generator module is installed:
-- Check `fsr_excel_generator.py` exists in the plugin folder
-- Verify `openpyxl` is installed: `pip install openpyxl`
-"""
-    except Exception as e:
-        log.error(f"❌ Excel generation failed: {e}")
-        import traceback
-        log.error(traceback.format_exc())
-        return f"""❌ Failed to generate Excel file.
-
-**Error:** {str(e)}
-
-**Troubleshooting:**
-1. Check the plugin logs for details
-2. Verify FSR data is valid in working memory
-3. Ensure write permissions for generated_documents folder
-
-Try again or contact support if the issue persists.
-"""
+# Add generators folder to Python path
+generators_folder = os.path.join(code_folder, 'generators')
+if generators_folder not in sys.path:
+    sys.path.insert(0, generators_folder)
+    log.info(f"Added to sys.path: {generators_folder}")
 
 
 @tool(return_direct=True)
@@ -123,43 +29,43 @@ def create_word_document(tool_input, cat):
     """
     Generate Word document with complete FSC report.
     
-    Creates a professional ISO 26262 compliant FSC document with:
-    - Executive summary
-    - Safety goals from HARA
+    Creates ISO 26262-3:2018 Clause 7 compliant document with:
+    - Safety goals and strategies
     - Functional Safety Requirements
-    - Allocation to architecture
-    - Compliance documentation
+    - Allocation matrix
+    - Completeness warnings for missing sections
     
     Examples:
     - "create word document"
-    - "generate word report"
-    - "create FSC document"
+    - "generate fsc document"
     """
     
     log.info("✅ TOOL CALLED: create_word_document")
     
+    # Get data from working memory
     fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
     goals_data = cat.working_memory.get("fsc_safety_goals", [])
-    strategies_data = cat.working_memory.get("fsc_strategies", [])
+    strategies_data = cat.working_memory.get("fsc_safety_strategies", {})
     system_name = cat.working_memory.get("system_name", "System")
     
     if not fsrs_data and not goals_data:
         return """❌ No FSC data available to export.
 
 **Required:** Complete the FSC development workflow:
-1. `load HARA for [system name]`
-2. `develop safety strategy for all goals`
-3. `derive FSRs for all goals`
+1. Load HARA for [system name]
+2. Develop safety strategies for all goals
+3. Derive FSRs for all goals
 
-Then you can generate Word documents with the complete FSC.
-"""
+Then generate the Word document."""
     
     try:
-        # Import Word generator
-        from .fsc_word_generator import generate_fsc_word
+        # Import from Functional_Safety_Concept subfolder
+        from generators.Functional_Safety_Concept import FSCWordGenerator
         
+        log.info("✅ Successfully imported FSCWordGenerator")
+        
+        # Setup output directory
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        plugin_folder = os.path.dirname(__file__)
         output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSC")
         os.makedirs(output_dir, exist_ok=True)
         
@@ -167,65 +73,297 @@ Then you can generate Word documents with the complete FSC.
         safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
                            for c in system_name).replace(" ", "_")
         
-        filename = f"FSC_Report_{safe_name}_{timestamp}.docx"
+        filename = f"FSC_{safe_name}_{timestamp}.docx"
         filepath = os.path.join(output_dir, filename)
         
-        # Create Word document
+        # Create generator instance
+        log.info(f"📄 Creating FSC Word generator for: {system_name}")
+        generator = FSCWordGenerator(plugin_folder)
+        
+        # Validate data
+        is_valid, validation_warnings, errors = generator.validate_data(goals_data, fsrs_data)
+        
+        if not is_valid:
+            error_msg = "❌ **FSC Data Validation Failed**\n\n"
+            for error in errors:
+                error_msg += f"- {error}\n"
+            return error_msg
+        
+        # Calculate statistics
+        stats = generator.calculate_statistics(goals_data, fsrs_data, strategies_data)
+        
+        # Prepare additional FSC data
+        fsc_data = {
+            'allocation': cat.working_memory.get("fsc_allocation_matrix", {}),
+            'mechanisms': cat.working_memory.get("fsc_safety_mechanisms", []),
+            'validation': cat.working_memory.get("validation_criteria", []),
+            'decomposition': cat.working_memory.get("fsc_asil_decompositions", [])
+        }
+        
+        # Check completeness
+        completeness_warnings = generator.check_completeness(
+            goals_data, fsrs_data, strategies_data, fsc_data
+        )
+        
+        # Generate document
         log.info(f"📄 Generating Word document: {filename}")
-        doc = generate_fsc_word(system_name, goals_data, fsrs_data, strategies_data)
+        doc = generator.generate(
+            system_name=system_name,
+            goals_data=goals_data,
+            fsrs_data=fsrs_data,
+            strategies_data=strategies_data,
+            fsc_data=fsc_data
+        )
+        
+        # Save document
         doc.save(filepath)
+        log.info(f"✅ Document saved: {filepath}")
         
-        # Calculate document statistics
-        pages_estimate = len(goals_data) * 2 + len(fsrs_data) // 3 + 10
-        
-        return f"""✅ **Word document generated successfully!**
+        # Build response
+        response = f"""✅ **FSC Word Document Generated Successfully!**
 
 **File:** `{filename}`
 **Location:** `generated_documents/06_FSC/`
-**Estimated Pages:** ~{pages_estimate} pages
+**Size:** ~{stats['estimated_pages']} pages (estimated)
 
-**Document Structure:**
-1. 📋 **Title Page** - System and document information
-2. 📝 **Executive Summary** - Overview and key metrics
-3. 🎯 **Safety Goals** ({len(goals_data)}) - From HARA analysis
-4. 🛡️ **Safety Strategies** - 9 strategy types per ISO 26262
-5. 📌 **Functional Safety Requirements** ({len(fsrs_data)}) - Complete FSR specifications
-6. 🏗️ **Allocation** - FSRs mapped to system architecture
-7. ✅ **Compliance** - ISO 26262-3:2018 Clause 7 requirements
+**Content Summary:**
+📋 Safety Goals: {stats['total_goals']}
+📌 FSRs: {stats['total_fsrs']}
+  - Detection: {stats['fsr_by_type']['detection']}
+  - Reaction: {stats['fsr_by_type']['reaction']}
+  - Indication: {stats['fsr_by_type']['indication']}
 
-**ISO 26262 Compliance:**
-- ✅ Clause 7.4.2 - FSR specification
-- ✅ Clause 7.4.2.8 - Architectural allocation
-- ✅ Clause 7.5 - Work product requirements
+**ASIL Distribution:**
+{chr(10).join([f"  - ASIL {asil}: {count}" for asil, count in sorted(stats['asil_distribution'].items())])}
 
-The document is ready for safety assessment and can be used in your safety case.
+**Quality Metrics:**
+- Coverage: {stats['coverage_pct']:.0f}% ({stats['goals_with_fsrs']}/{stats['total_goals']} goals)
+- Allocation: {stats['allocation_pct']:.0f}% ({stats['allocated_fsrs']}/{stats['total_fsrs']} FSRs)
 """
+        
+        # Add completeness warnings
+        if completeness_warnings:
+            response += f"\n{'='*60}\n"
+            response += "\n⚠️ **DOCUMENT COMPLETENESS WARNINGS** ⚠️\n\n"
+            response += "The following sections are incomplete:\n\n"
+            
+            for warning in completeness_warnings:
+                response += f"{warning}\n"
+            
+            response += f"\n{'='*60}\n"
+            response += "\n**📋 Note:** These warnings are on the title page of the document.\n"
+            response += "Incomplete sections are marked with ⚠️ INCOMPLETE.\n"
+            
+            response += """
+**⚠️ Recommended Actions:**
+1. Complete the missing workflow steps listed above
+2. Regenerate the document
+3. Review incomplete sections marked with ⚠️
+"""
+        else:
+            response += """
+**✅ Document Complete!**
+All sections have been filled with available data.
+"""
+        
+        # Add validation warnings
+        if validation_warnings:
+            response += "\n**Data Quality Notices:**\n"
+            for warning in validation_warnings[:3]:
+                response += f"  ℹ️ {warning}\n"
+        
+        response += """
+**ISO 26262-3:2018 Sections:**
+1. ✅ Introduction
+2. ✅ Safety Goals Overview
+3. ✅ Functional Safety Requirements
+4. ✅ FSR Allocation
+5. ✅ Safety Mechanisms
+6. ✅ ASIL Decomposition
+7. ✅ Verification & Validation
+8. ✅ Traceability
+9. ✅ Approvals
+
+**Next Steps:**
+1. 📖 Review document in Microsoft Word
+2. 👥 Share with safety team
+3. ✍️ Complete approvals (Section 9)
+4. ➡️ Proceed to Technical Safety Concept
+"""
+        
+        return response
         
     except ImportError as e:
         log.error(f"❌ Import error: {e}")
+        import traceback
+        log.error(traceback.format_exc())
+        
         return f"""❌ Word generator not available.
 
 **Error:** {str(e)}
 
-**Solution:** Ensure the FSC Word generator module is installed:
-- Check `fsc_word_generator.py` exists in the plugin folder
-- Verify `python-docx` is installed: `pip install python-docx`
+**Debug Info:**
+- Current file: {current_file}
+- Tools folder: {tools_folder}
+- Code folder: {code_folder}
+- Plugin folder: {plugin_folder}
+- Generators folder: {generators_folder}
+- Generators in sys.path: {generators_folder in sys.path}
+
+**Expected file location:**
+`{os.path.join(generators_folder, 'Functional_Safety_Concept', 'fsc_word_generator.py')}`
+
+**File exists:** {os.path.exists(os.path.join(generators_folder, 'Functional_Safety_Concept', 'fsc_word_generator.py'))}
+
+**Solution:**
+1. Verify file exists at expected location
+2. Check __init__.py files exist in:
+   - code/generators/__init__.py
+   - code/generators/Functional_Safety_Concept/__init__.py
+3. Install python-docx: pip install python-docx
 """
+        
     except Exception as e:
         log.error(f"❌ Word generation failed: {e}")
         import traceback
         log.error(traceback.format_exc())
+        
         return f"""❌ Failed to generate Word document.
 
 **Error:** {str(e)}
 
 **Troubleshooting:**
-1. Check the plugin logs for details
-2. Verify FSC data is valid in working memory
-3. Ensure write permissions for generated_documents folder
-
-Try again or contact support if the issue persists.
+1. Check plugin logs for details
+2. Verify FSC data in working memory
+3. Ensure write permissions for generated_documents/
 """
+
+
+@tool(return_direct=True)
+def create_excel_file(tool_input, cat):
+    """
+    Generate Excel file with FSC data (FSRs, allocation, traceability).
+    
+    Creates Excel workbook with multiple sheets:
+    - FSRs listing
+    - Allocation matrix
+    - Traceability
+    - Statistics
+    
+    Examples: 
+    - "create excel file"
+    - "generate excel spreadsheet"
+    """
+    
+    log.info("✅ TOOL CALLED: create_excel_file")
+    
+    fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
+    goals_data = cat.working_memory.get("fsc_safety_goals", [])
+    system_name = cat.working_memory.get("system_name", "System")
+    
+    if not fsrs_data:
+        return """❌ No FSC data available to export.
+
+**Required:** Derive FSRs first using: `derive FSRs for all goals`
+
+Then generate Excel file."""
+    
+    try:
+        # Import from Functional_Safety_Concept subfolder
+        from Functional_Safety_Concept.fsc_excel_generator import FSCExcelGenerator
+        
+        log.info("✅ Successfully imported FSCExcelGenerator")
+        
+        # Setup output directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSC")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Sanitize system name
+        safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
+                           for c in system_name).replace(" ", "_")
+        
+        filename = f"FSC_{safe_name}_{timestamp}.xlsx"
+        filepath = os.path.join(output_dir, filename)
+        
+        # Create generator
+        log.info(f"📊 Creating FSC Excel generator for: {system_name}")
+        generator = FSCExcelGenerator()
+        
+        # Validate
+        is_valid, warnings, errors = generator.validate_data(goals_data, fsrs_data)
+        
+        if not is_valid:
+            return "❌ Data validation failed: " + "; ".join(errors)
+        
+        # Calculate statistics
+        stats = generator.calculate_statistics(goals_data, fsrs_data)
+        
+        # Generate workbook
+        log.info(f"📊 Generating Excel file: {filename}")
+        
+        wb = generator.generate(
+            system_name=system_name,
+            goals_data=goals_data,
+            fsrs_data=fsrs_data,
+            strategies_data=cat.working_memory.get("fsc_safety_strategies", {}),
+            allocation_data=cat.working_memory.get("fsc_allocation_matrix", {})
+        )
+        
+        # Save workbook
+        wb.save(filepath)
+        log.info(f"✅ Excel saved: {filepath}")
+        
+        # Build response
+        asil_summary = ', '.join([f"ASIL {asil}: {count}" for asil, count in sorted(stats['asil_distribution'].items())])
+        
+        return f"""✅ **FSC Excel Workbook Generated!**
+
+**File:** `{filename}`
+**Location:** `generated_documents/06_FSC/`
+
+**Sheets:**
+1. 📋 Safety Goals ({stats['total_goals']} goals)
+2. 📌 FSRs ({stats['total_fsrs']} requirements)
+3. 🏗️ Allocation Matrix
+4. 🔗 Traceability
+5. 📊 Statistics
+
+**Content:**
+- Safety Goals: {stats['total_goals']}
+- FSRs: {stats['total_fsrs']}
+- Allocated: {stats['allocated_fsrs']} ({stats['allocated_fsrs']/stats['total_fsrs']*100:.0f}%)
+
+**ASIL Distribution:** {asil_summary}
+
+Ready for filtering, sorting, and analysis in Excel!"""
+        
+    except ImportError as e:
+        log.error(f"❌ Import error: {e}")
+        import traceback
+        log.error(traceback.format_exc())
+        
+        return f"""❌ Excel generator not available.
+
+**Error:** {str(e)}
+
+**Debug Info:**
+- Generators folder: {generators_folder}
+- Expected file: {os.path.join(generators_folder, 'Functional_Safety_Concept', 'fsc_excel_generator.py')}
+- File exists: {os.path.exists(os.path.join(generators_folder, 'Functional_Safety_Concept', 'fsc_excel_generator.py'))}
+
+**Solution:**
+1. Verify fsc_excel_generator.py exists
+2. Check __init__.py files
+3. Install openpyxl: pip install openpyxl
+"""
+        
+    except Exception as e:
+        log.error(f"❌ Excel generation failed: {e}")
+        import traceback
+        log.error(traceback.format_exc())
+        
+        return f"❌ Failed to generate Excel: {str(e)}"
 
 
 @tool(return_direct=True)
@@ -240,7 +378,6 @@ def generate_fsc_files(tool_input, cat):
     Examples:
     - "generate fsc files"
     - "create all fsc documents"
-    - "export complete fsc"
     """
     
     log.info("✅ TOOL CALLED: generate_fsc_files")
@@ -250,71 +387,109 @@ def generate_fsc_files(tool_input, cat):
     if not fsrs_data:
         return """❌ No FSC data available.
 
-**Required:** Derive FSRs first: `derive FSRs for all goals`
-"""
-    
-    # Generate Excel
-    excel_result = create_excel_file("", cat)
+**Required:** Derive FSRs first: `derive FSRs for all goals`"""
     
     # Generate Word
     word_result = create_word_document("", cat)
     
-    # Combine results
-    return f"""✅ **Complete FSC documentation package generated!**
+    # Generate Excel
+    excel_result = create_excel_file("", cat)
+    
+    # Combine
+    return f"""✅ **Complete FSC Documentation Package Generated!**
 
----
+{'='*70}
 
-{excel_result}
-
----
+### 📄 Word Document
 
 {word_result}
 
----
+{'='*70}
+
+### 📊 Excel Workbook
+
+{excel_result}
+
+{'='*70}
 
 **Next Steps:**
-1. Review the generated files in `generated_documents/06_FSC/`
-2. Share with your safety team for review
-3. Include in your ISO 26262 work product documentation
+1. Review files in `generated_documents/06_FSC/`
+2. Share with safety team
+3. Include in ISO 26262 documentation
 """
 
 
-@tool(return_direct=False)
-def set_output_format(tool_input, cat):
+@tool(return_direct=True)
+def check_fsc_generators(tool_input, cat):
     """
-    Set output format preference for agent responses.
+    Diagnostic tool to verify FSC generators are accessible.
     
-    Options:
-    - "minimal" - Plain text, no markdown/tables
-    - "standard" - Normal formatting (default)
-    - "detailed" - Extra information and context
+    Checks:
+    - Folder structure
+    - File existence
+    - Import capability
     
-    Examples:
-    - "set output format to minimal"
-    - "format output as detailed"
-    - "use standard formatting"
+    Use this to troubleshoot import errors.
+    
+    Example: "check fsc generators"
     """
     
-    log.info(f"✅ TOOL CALLED: set_output_format with input: {tool_input}")
+    log.info("✅ TOOL CALLED: check_fsc_generators")
     
-    input_lower = str(tool_input).lower()
+    report = "🔍 **FSC Generator Diagnostic Report**\n\n"
     
-    if "minimal" in input_lower or "plain" in input_lower or "simple" in input_lower:
-        format_type = "minimal"
-        description = "Plain text without tables or markdown"
-    elif "detailed" in input_lower or "verbose" in input_lower:
-        format_type = "detailed"
-        description = "Detailed formatting with extra context"
-    else:
-        format_type = "standard"
-        description = "Normal formatting with tables and markdown"
+    # Check folder structure
+    report += "**Folder Structure:**\n"
+    report += f"✅ Plugin folder: `{plugin_folder}`\n" if os.path.exists(plugin_folder) else "❌ Plugin folder not found\n"
+    report += f"✅ Code folder: `{code_folder}`\n" if os.path.exists(code_folder) else "❌ Code folder not found\n"
+    report += f"✅ Tools folder: `{tools_folder}`\n" if os.path.exists(tools_folder) else "❌ Tools folder not found\n"
+    report += f"✅ Generators folder: `{generators_folder}`\n" if os.path.exists(generators_folder) else "❌ Generators folder not found\n"
     
-    # Store preference
-    cat.working_memory["output_format"] = format_type
+    fsc_folder = os.path.join(generators_folder, 'Functional_Safety_Concept')
+    report += f"✅ FSC subfolder: `{fsc_folder}`\n" if os.path.exists(fsc_folder) else "❌ FSC subfolder not found\n"
     
-    log.info(f"📝 Output format set to: {format_type}")
+    # Check files
+    report += "\n**Required Files:**\n"
     
-    return {
-        "output": f"Output format preference updated to: **{format_type}**. "
-                  f"{description}. This will apply to future responses."
+    files = {
+        'generators __init__': os.path.join(generators_folder, '__init__.py'),
+        'FSC __init__': os.path.join(fsc_folder, '__init__.py'),
+        'fsc_word_generator.py': os.path.join(fsc_folder, 'fsc_word_generator.py'),
+        'fsc_excel_generator.py': os.path.join(fsc_folder, 'fsc_excel_generator.py'),
+        'fsr_excel_generator.py': os.path.join(fsc_folder, 'fsr_excel_generator.py'),
     }
+    
+    all_exist = True
+    for name, path in files.items():
+        exists = os.path.exists(path)
+        report += f"{'✅' if exists else '❌'} {name}\n"
+        if not exists:
+            all_exist = False
+    
+    # Check sys.path
+    report += f"\n**Python Path:**\n"
+    report += f"{'✅' if generators_folder in sys.path else '⚠️'} Generators in sys.path\n"
+    
+    # Try imports
+    report += "\n**Import Tests:**\n"
+    
+    try:
+        from generators.Functional_Safety_Concept import FSCWordGenerator
+        report += "✅ FSCWordGenerator imported successfully\n"
+    except Exception as e:
+        report += f"❌ FSCWordGenerator import failed: {e}\n"
+    
+    try:
+        from generators.Functional_Safety_Concept import FSCExcelGenerator
+        report += "✅ FSCExcelGenerator imported successfully\n"
+    except Exception as e:
+        report += f"❌ FSCExcelGenerator import failed: {e}\n"
+    
+    # Overall status
+    report += "\n**Status:**\n"
+    if all_exist:
+        report += "✅ All files exist - Ready to generate documents!\n"
+    else:
+        report += "❌ Some files missing - Check file locations\n"
+    
+    return report
