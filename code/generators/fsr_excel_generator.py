@@ -1,7 +1,7 @@
 # ==============================================================================
-# fsr_excel_generator.py (NEW FILE)
+# fsr_excel_generator.py
 # Excel file generation for FSC data
-# Place in: AI_Agent-OutputFormatter/fsr_excel_generator.py
+# Place in: AI_Agent-OutputFormatter/generators/fsr_excel_generator.py
 # ==============================================================================
 
 from openpyxl import Workbook
@@ -9,12 +9,13 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 
-def generate_fsr_excel(fsrs_data, system_name):
+def generate_fsr_excel(fsrs_data, goals_data, system_name):
     """
     Generate Excel workbook with FSC data.
     
     Args:
         fsrs_data: List of FSR dictionaries from working memory
+        goals_data: List of Safety Goal dictionaries from working memory
         system_name: Name of the system
     
     Returns:
@@ -34,7 +35,7 @@ def generate_fsr_excel(fsrs_data, system_name):
     # Populate worksheets
     _create_fsr_sheet(ws_fsrs, fsrs_data, system_name)
     _create_allocation_sheet(ws_allocation, fsrs_data, system_name)
-    _create_traceability_sheet(ws_traceability, fsrs_data, system_name)
+    _create_traceability_sheet(ws_traceability, fsrs_data, goals_data, system_name)
     _create_statistics_sheet(ws_statistics, fsrs_data, system_name)
     
     return wb
@@ -108,7 +109,7 @@ def _create_allocation_sheet(ws, fsrs_data, system_name):
     
     for fsr in fsrs_data:
         component = fsr.get('allocated_to')
-        if component:
+        if component and component not in ['TBD', 'NOT ALLOCATED', 'N/A', '']:
             if component not in by_component:
                 by_component[component] = []
             by_component[component].append(fsr)
@@ -170,15 +171,15 @@ def _create_allocation_sheet(ws, fsrs_data, system_name):
         ws.column_dimensions[get_column_letter(col)].width = 25
 
 
-def _create_traceability_sheet(ws, fsrs_data, system_name):
-    """Create traceability matrix."""
+def _create_traceability_sheet(ws, fsrs_data, goals_data, system_name):
+    """Create traceability matrix with enhanced information from safety goals."""
     
     ws['A1'] = f"Traceability Matrix - {system_name}"
     ws['A1'].font = Font(size=14, bold=True)
-    ws.merge_cells('A1:D1')
+    ws.merge_cells('A1:F1')
     
     # Headers
-    headers = ["Safety Goal ID", "FSR ID", "FSR Type", "ASIL"]
+    headers = ["Safety Goal ID", "Safety Goal Description", "FSR ID", "FSR Type", "ASIL", "Allocated To"]
     
     header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF")
@@ -188,6 +189,15 @@ def _create_traceability_sheet(ws, fsrs_data, system_name):
         cell.value = header
         cell.font = header_font
         cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+    
+    # Create a lookup dictionary for safety goals
+    goals_dict = {}
+    if goals_data:
+        for goal in goals_data:
+            goal_id = goal.get('id', goal.get('goal_id', ''))
+            if goal_id:
+                goals_dict[goal_id] = goal
     
     # Group by safety goal
     by_goal = {}
@@ -201,15 +211,34 @@ def _create_traceability_sheet(ws, fsrs_data, system_name):
     row_idx = 4
     
     for sg_id, fsrs in sorted(by_goal.items()):
-        for fsr in fsrs:
-            ws.cell(row=row_idx, column=1).value = sg_id
-            ws.cell(row=row_idx, column=2).value = fsr.get('id', '')
-            ws.cell(row=row_idx, column=3).value = fsr.get('type', '')
-            ws.cell(row=row_idx, column=4).value = fsr.get('asil', '')
+        # Get safety goal description if available
+        sg_description = ""
+        if sg_id in goals_dict:
+            sg_description = goals_dict[sg_id].get('description', goals_dict[sg_id].get('goal', ''))[:100]
+        
+        for idx, fsr in enumerate(fsrs):
+            # Only show safety goal description on first FSR of each goal
+            if idx == 0:
+                ws.cell(row=row_idx, column=1).value = sg_id
+                ws.cell(row=row_idx, column=2).value = sg_description
+                ws.cell(row=row_idx, column=1).font = Font(bold=True)
+            else:
+                ws.cell(row=row_idx, column=1).value = ""
+                ws.cell(row=row_idx, column=2).value = ""
+            
+            ws.cell(row=row_idx, column=3).value = fsr.get('id', '')
+            ws.cell(row=row_idx, column=4).value = fsr.get('type', '')
+            ws.cell(row=row_idx, column=5).value = fsr.get('asil', '')
+            ws.cell(row=row_idx, column=6).value = fsr.get('allocated_to', 'Not allocated')
             row_idx += 1
     
-    for col in range(1, 5):
-        ws.column_dimensions[get_column_letter(col)].width = 20
+    # Auto-adjust widths
+    ws.column_dimensions['A'].width = 18
+    ws.column_dimensions['B'].width = 40
+    ws.column_dimensions['C'].width = 18
+    ws.column_dimensions['D'].width = 20
+    ws.column_dimensions['E'].width = 10
+    ws.column_dimensions['F'].width = 25
 
 
 def _create_statistics_sheet(ws, fsrs_data, system_name):
@@ -221,7 +250,8 @@ def _create_statistics_sheet(ws, fsrs_data, system_name):
     
     # Calculate statistics
     total = len(fsrs_data)
-    allocated = sum(1 for f in fsrs_data if f.get('allocated_to'))
+    allocated = sum(1 for f in fsrs_data 
+                   if f.get('allocated_to') and f.get('allocated_to') not in ['TBD', 'NOT ALLOCATED', 'N/A', ''])
     
     by_asil = {}
     by_type = {}
@@ -235,7 +265,7 @@ def _create_statistics_sheet(ws, fsrs_data, system_name):
         by_type[fsr_type] = by_type.get(fsr_type, 0) + 1
         
         component = fsr.get('allocated_to')
-        if component:
+        if component and component not in ['TBD', 'NOT ALLOCATED', 'N/A', '']:
             by_component[component] = by_component.get(component, 0) + 1
     
     # Write statistics
@@ -249,6 +279,11 @@ def _create_statistics_sheet(ws, fsrs_data, system_name):
     ws.cell(row=row, column=1).value = "Allocated"
     ws.cell(row=row, column=2).value = allocated
     ws.cell(row=row, column=3).value = f"{allocated/total*100:.1f}%" if total > 0 else "0%"
+    row += 1
+    
+    ws.cell(row=row, column=1).value = "Unallocated"
+    ws.cell(row=row, column=2).value = total - allocated
+    ws.cell(row=row, column=3).value = f"{(total-allocated)/total*100:.1f}%" if total > 0 else "0%"
     row += 2
     
     # By ASIL
@@ -275,6 +310,20 @@ def _create_statistics_sheet(ws, fsrs_data, system_name):
         ws.cell(row=row, column=2).value = count
         ws.cell(row=row, column=3).value = f"{count/total*100:.1f}%"
         row += 1
+    
+    row += 1
+    
+    # By Component
+    if by_component:
+        ws.cell(row=row, column=1).value = "Distribution by Component"
+        ws.cell(row=row, column=1).font = Font(bold=True)
+        row += 1
+        
+        for component, count in sorted(by_component.items(), key=lambda x: x[1], reverse=True):
+            ws.cell(row=row, column=1).value = component
+            ws.cell(row=row, column=2).value = count
+            ws.cell(row=row, column=3).value = f"{count/total*100:.1f}%"
+            row += 1
     
     # Auto-adjust
     ws.column_dimensions['A'].width = 25
