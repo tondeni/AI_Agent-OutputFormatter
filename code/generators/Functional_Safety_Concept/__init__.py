@@ -10,13 +10,12 @@ Generators for Functional Safety Concept (FSC) related documents.
 # Import specific classes/functions for easier access
 from .fsr_excel_generator import generate_fsr_excel
 from .fsc_excel_generator import FSCExcelGenerator, generate_fsc_excel
-from .fsc_word_generator import FSCWordGenerator, generate_fsc_word
+from .fsc_word_generator import FSCWordGenerator
 
 # Define what's available when someone does: from generators.Functional_Safety_Concept import *
 __all__ = [
     'generate_fsr_excel',
     'generate_fsc_excel',
-    'generate_fsc_word',
     'FSCWordGenerator',
 ]
 

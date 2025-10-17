@@ -113,7 +113,7 @@ def add_file_generation_offers(message, cat):
         offer_text += "- `create allocation excel` - Generate allocation matrix\n"
         offer_text += "- `generate FSC document` - Generate complete Word document\n"
         
-        message["content"] += offer_text
+        message.text += offer_text
         log.info("💾 Added file generation offers")
     
     return message
@@ -143,7 +143,7 @@ def add_traceability_info(message, cat):
             trace_info += f"- **Safety Goals:** {len(goal_fsr_count)}\n"
             trace_info += f"- **Avg FSRs per Goal:** {len(fsrs_data) / len(goal_fsr_count):.1f}\n"
             
-            message["content"] += trace_info
+            message.text += trace_info
             log.info("🔗 Added traceability information")
     
     return message

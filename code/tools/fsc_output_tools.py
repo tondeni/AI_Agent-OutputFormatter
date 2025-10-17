@@ -8,14 +8,15 @@ from cat.log import log
 import os
 import sys
 from datetime import datetime
+from ..generators.Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator 
+from ..generators.Functional_Safety_Concept.fsc_excel_generator import FSCExcelGenerator
+from ..generators.Functional_Safety_Concept.fsr_excel_generator import generate_fsr_excel
 
 # Setup paths
 current_file = os.path.abspath(__file__)
 tools_folder = os.path.dirname(current_file)
 code_folder = os.path.dirname(tools_folder)
 plugin_folder = os.path.dirname(code_folder)
-
-sys.path.insert(0, os.path.join(code_folder, 'generators'))
 
 @tool(
     return_direct=True,
@@ -29,80 +30,68 @@ def create_fsc_word_document(tool_input, cat):
     """
     Generate FSC Word document.
     
-    Creates ISO 26262-3:2018 Clause 7 compliant Word document from FSC data
-    in working memory. Includes completeness warnings for missing sections.
-    
-    Examples:
-    - "create fsc word document"
-    - "generate word file"
-    - "export fsc to word"
+    Reads structured content from working memory (contract-based).
+    No dependencies on FSC Developer plugin.
     """
     
     log.info("✅ TOOL CALLED: create_fsc_word_document")
     
-    # Get data from working memory
-    goals_data = cat.working_memory.get("fsc_safety_goals", [])
-    fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
-    strategies_data = cat.working_memory.get("fsc_safety_strategies", {})
-    system_name = cat.working_memory.get("system_name", "System")
+    # Check for structured content (contract v1.0)
+    structured_content = cat.working_memory.get("fsc_structured_content")
     
-    # Quick validation
-    if not goals_data or not fsrs_data:
-        return """❌ Insufficient FSC data for Word document generation.
+    if structured_content:
+        log.info("✅ Found structured content (contract v1.0)")
+        system_name = structured_content.get('system_name', 'Unknown')
+        
+        # Validate schema version
+        metadata = structured_content.get('metadata', {})
+        schema_version = metadata.get('schema_version', 'unknown')
+        
+        if schema_version != '1.0':
+            return f"""⚠️ Schema version mismatch
 
-**Missing:**
-- Safety Goals: {'✅' if goals_data else '❌ Missing'}
-- FSRs: {'✅' if fsrs_data else '❌ Missing'}
+**Expected:** 1.0
+**Found:** {schema_version}
 
-**Required Workflow:**
-1. Load HARA for [system]
-2. Derive FSRs for all goals
-3. Generate Word document
+Content may be from incompatible FSC Developer version.
+Please regenerate FSC content."""
+    else:
+        # Fall back to legacy
+        log.info("Using legacy format")
+        goals_data = cat.working_memory.get("fsc_safety_goals", [])
+        fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
+        system_name = cat.working_memory.get("system_name", "System")
+        
+        if not goals_data or not fsrs_data:
+            return """❌ No FSC data found.
 
-Please complete FSC development in FSC Developer plugin first."""
+Generate FSC content first:
+- New: `generate structured FSC content` (FSC Developer)
+- Legacy: `derive FSRs for all goals` (FSC Developer)
+
+Then retry document generation."""
     
     try:
-        # Import generator
-        from generators.Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator        # Create generator
-        generator = FSCWordGenerator(plugin_folder)
+        # Import generator (self-contained, no external deps)
+        from ..generators.Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator  
         
-        # Validate data
-        is_valid, validation_warnings, errors = generator.validate_data(goals_data, fsrs_data)
-        
-        if not is_valid:
-            error_msg = "❌ **FSC Data Validation Failed**\n\n"
-            for error in errors:
-                error_msg += f"- {error}\n"
-            return error_msg
-        
-        # Calculate statistics
-        stats = generator.calculate_statistics(goals_data, fsrs_data, strategies_data)
-        
-        # Prepare additional data
-        fsc_data = {
-            'allocation': cat.working_memory.get("fsc_allocation_matrix", {}),
-            'mechanisms': cat.working_memory.get("fsc_safety_mechanisms", []),
-            'validation': cat.working_memory.get("validation_criteria", []),
-            'decomposition': cat.working_memory.get("fsc_asil_decompositions", [])
-        }
-        
-        # Check completeness BEFORE generation
-        completeness_warnings = generator.check_completeness(
-            goals_data, fsrs_data, strategies_data, fsc_data
-        )
+        generator = FSCWordGenerator()
         
         # Generate document
-        log.info(f"📄 Generating Word document for {system_name}")
+        if structured_content:
+            log.info("Generating from structured content")
+            doc = generator.generate(structured_content=structured_content)
+            format_type = "Structured (Contract v1.0)"
+        else:
+            log.info("Generating from legacy format")
+            doc = generator.generate(
+                system_name=system_name,
+                goals_data=goals_data,
+                fsrs_data=fsrs_data
+            )
+            format_type = "Legacy"
         
-        doc = generator.generate(
-            system_name=system_name,
-            goals_data=goals_data,
-            fsrs_data=fsrs_data,
-            strategies_data=strategies_data,
-            fsc_data=fsc_data
-        )
-        
-        # Save document
+        # Save
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSC")
         os.makedirs(output_dir, exist_ok=True)
@@ -115,104 +104,44 @@ Please complete FSC development in FSC Developer plugin first."""
         
         doc.save(filepath)
         
-        # Build response
-        response = f"""✅ **FSC Word Document Generated!**
+        # Get stats if structured content
+        stats_info = ""
+        if structured_content:
+            num_fsrs = len(structured_content.get('functional_safety_requirements', []))
+            num_sms = len(structured_content.get('safety_mechanisms', []))
+            stats_info = f"""
+📊 **Content:**
+- {num_fsrs} Functional Safety Requirements
+- {num_sms} Safety Mechanisms
+- Traceability matrix included
+"""
+        
+        return f"""✅ **FSC Word Document Generated!**
 
 **File:** `{filename}`
 **Location:** `generated_documents/06_FSC/`
-**Size:** ~{stats['estimated_pages']} pages (estimated)
+**Format:** {format_type}
+{stats_info}
+📄 **Document includes:**
+- Title page with ISO 26262 reference
+- Introduction and safety goals
+- Detailed FSR specifications
+- Safety mechanisms by type
+- FSR-SM traceability matrix
+- Architectural allocation
+- Verification strategy
 
-**Content:**
-📋 Safety Goals: {stats['total_goals']}
-📌 FSRs: {stats['total_fsrs']}
-  - Detection: {stats['fsr_by_type']['detection']}
-  - Reaction: {stats['fsr_by_type']['reaction']}
-  - Indication: {stats['fsr_by_type']['indication']}
-
-**ASIL Distribution:**
-{chr(10).join([f"  - ASIL {asil}: {count}" for asil, count in sorted(stats['asil_distribution'].items())])}
-
-**Quality Metrics:**
-- Coverage: {stats['coverage_pct']:.0f}% ({stats['goals_with_fsrs']}/{stats['total_goals']} goals)
-- Allocation: {stats['allocation_pct']:.0f}% ({stats['allocated_fsrs']}/{stats['total_fsrs']} FSRs)
-"""
-        
-        # Add completeness warnings prominently
-        if completeness_warnings:
-            response += f"\n{'='*60}\n"
-            response += "\n⚠️ **DOCUMENT COMPLETENESS WARNINGS** ⚠️\n\n"
-            response += "The following sections are incomplete or missing:\n\n"
-            
-            for warning in completeness_warnings:
-                response += f"{warning}\n"
-            
-            response += f"\n{'='*60}\n"
-            response += "\n**📋 Note:** These warnings are also included in the document on the title page.\n"
-            response += "Incomplete sections are marked with ⚠️ INCOMPLETE markers in the document.\n"
-        
-        # Add validation warnings if any
-        if validation_warnings:
-            response += "\n**Data Quality Notices:**\n"
-            for warning in validation_warnings[:3]:
-                response += f"  ℹ️ {warning}\n"
-        
-        response += """
-**ISO 26262-3:2018 Sections:**
-1. ✅ Introduction
-2. ✅ Safety Goals Overview
-3. ✅ Functional Safety Requirements
-4. ✅ FSR Allocation
-5. ✅ Safety Mechanisms
-6. ✅ ASIL Decomposition
-7. ✅ Verification & Validation
-8. ✅ Traceability
-9. ✅ Approvals
-"""
-        
-        if completeness_warnings:
-            response += """
-**⚠️ Recommended Actions:**
-1. Complete the missing workflow steps listed above
-2. Regenerate the document after completion
-3. Review incomplete sections marked with ⚠️ in the document
-"""
-        else:
-            response += """
-**✅ Document Complete!**
-All sections have been filled with available data.
-"""
-        
-        response += """
 **Next Steps:**
-1. 📖 Review document in Microsoft Word
-2. 👥 Share with safety team for technical review
-3. ✍️ Complete Section 9 (Approvals)
-4. ➡️ Proceed to Technical Safety Concept
-"""
-        
-        return response
-        
-    except ImportError as e:
-        log.error(f"❌ Import error: {e}")
-        return f"""❌ Word generator not available.
-
-**Error:** {str(e)}
-
-**Solution:**
-1. Ensure `fsc_word_generator.py` exists in `code/generators/`
-2. Install python-docx: `pip install python-docx`
-"""
+1. 📖 Review in Microsoft Word
+2. 👥 Share with safety team
+3. ✍️ Complete approvals section"""
         
     except Exception as e:
-        log.error(f"❌ Word generation failed: {e}")
+        log.error(f"Document generation failed: {e}")
         import traceback
         log.error(traceback.format_exc())
-        return f"""❌ Failed to generate Word document.
-
-**Error:** {str(e)}
-
-Check plugin logs for details."""
-
+        return f"❌ Error: {str(e)}"
+ 
 
 @tool(
     return_direct=True,

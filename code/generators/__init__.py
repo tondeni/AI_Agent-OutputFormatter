@@ -15,7 +15,7 @@ This package contains generators for various output formats:
 # Import main generator functions for easier access
 from .Functional_Safety_Concept.fsr_excel_generator import generate_fsr_excel
 from .Functional_Safety_Concept.fsc_excel_generator import FSCExcelGenerator, generate_fsc_excel
-from .Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator, generate_fsc_word
+from .Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator
 
 # Optional: Import other generators when you create them
 # from .fsc_word_generator import generate_fsc_word
@@ -25,7 +25,6 @@ from .Functional_Safety_Concept.fsc_word_generator import FSCWordGenerator, gene
 __all__ = [
     'generate_fsr_excel',
     'generate_fsc_excel',
-    'generate_fsc_word',
     FSCWordGenerator
 ]
 

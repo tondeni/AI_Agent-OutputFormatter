@@ -1,0 +1,175 @@
+{
+  "document_structure": {
+    "1_introduction": {
+      "title": "1. Introduction",
+      "subsections": {
+        "1_1_purpose": {
+          "title": "1.1 Purpose and Scope",
+          "prompt": "State that this Functional Safety Concept defines the functional safety requirements derived from safety goals, their allocation to system architecture, and functional-level safety mechanisms per ISO 26262-3:2018, Clause 7.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.5"
+        },
+        "1_2_references": {
+          "title": "1.2 Referenced Documents",
+          "prompt": "List: Item Definition (ISO 26262-3, Clause 5), HARA (ISO 26262-3, Clause 6), ISO 26262-3:2018, ISO 26262-9:2018 (if ASIL decomposition applied).",
+          "iso_clause": "ISO 26262-8:2018, Clause 6.4.2"
+        },
+        "1_3_terms": {
+          "title": "1.3 Terms, Definitions, and Abbreviations",
+          "prompt": "Define: FSR (Functional Safety Requirement), ASIL, FTTI (Fault-Tolerant Time Interval), Safe State, and project-specific terms."
+        }
+      }
+    },
+    "2_safety_goals": {
+      "title": "2. Safety Goals Overview",
+      "subsections": {
+        "2_1_summary": {
+          "title": "2.1 Safety Goals Summary",
+          "prompt": "Present a table with: SG-ID, Safety Goal Statement, ASIL, Safe State, FTTI. Include total count per ASIL level.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.1"
+        },
+        "2_2_rationale": {
+          "title": "2.2 Safety Goal Rationale",
+          "prompt": "For each safety goal, briefly explain the hazardous scenario it addresses (from HARA) and why the specified safe state is appropriate."
+        }
+      }
+    },
+    "3_functional_safety_requirements": {
+      "title": "3. Functional Safety Requirements (FSRs)",
+      "subsections": {
+        "3_1_overview": {
+          "title": "3.1 FSR Overview",
+          "prompt": "Explain that FSRs specify WHAT functional behavior is required to prevent safety goal violations. Describe the derivation approach used (Detection-Reaction-Indication decomposition).",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2"
+        },
+        "3_2_detection": {
+          "title": "3.2 Detection Requirements",
+          "prompt": "List all FSRs for fault detection. Table format: FSR-ID, Requirement, ASIL, Parent Safety Goal, Allocated To. These specify WHAT faults need to be detected, not HOW to detect them technically.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.b"
+        },
+        "3_3_reaction": {
+          "title": "3.3 Reaction Requirements",
+          "prompt": "List all FSRs for achieving safe state. Include FTTI and safe state specifications. These specify WHAT reactions are required, not the technical implementation.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.c"
+        },
+        "3_4_indication": {
+          "title": "3.4 Indication Requirements",
+          "prompt": "List all FSRs for fault communication. Specify notification targets (driver, VCU, etc.) and functional timing requirements.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.f,g"
+        }
+      }
+    },
+    "4_allocation": {
+      "title": "4. FSR Allocation",
+      "subsections": {
+        "4_1_matrix": {
+          "title": "4.1 Allocation Matrix",
+          "prompt": "Create table: FSR-ID | Requirement | ASIL | Allocated Component | Interface Type | Rationale. Show allocation to HW, SW, and external systems at functional level.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.8"
+        },
+        "4_2_architecture": {
+          "title": "4.2 Functional Architecture",
+          "prompt": "Describe high-level functional architecture showing main functional blocks, data flows, and component interactions. This is FUNCTIONAL architecture, not detailed technical design.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.8"
+        },
+        "4_3_interfaces": {
+          "title": "4.3 Interface Overview",
+          "prompt": "Define functional interfaces between allocated elements. Internal vs external interfaces. Functional requirements, not technical protocols.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.8"
+        }
+      }
+    },
+    "5_safety_mechanisms": {
+      "title": "5. Functional Safety Mechanisms",
+      "subsections": {
+        "5_1_overview": {
+          "title": "5.1 Safety Mechanism Overview",
+          "prompt": "Explain that these are FUNCTIONAL-LEVEL strategies per ISO 26262-3:2018, 7.4.2.3. Technical implementation details will be specified in Technical Safety Concept (ISO 26262-4).",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3"
+        },
+        "5_2_detection_strategies": {
+          "title": "5.2 Detection Strategies",
+          "prompt": "List functional strategies for fault detection: plausibility checks, redundant sensing, sequence monitoring. Describe WHAT detection approach, not technical HOW (ADC specs, algorithms).",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.b"
+        },
+        "5_3_reaction_strategies": {
+          "title": "5.3 Reaction and Control Strategies",
+          "prompt": "Describe safe state transition strategies, degradation approaches, fault isolation. Functional level only.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.c,e"
+        },
+        "5_4_tolerance_strategies": {
+          "title": "5.4 Fault Tolerance Strategies",
+          "prompt": "Describe redundancy and diversity strategies at functional level (e.g., dual sensors, independent channels). Specify independence requirements without technical implementation.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.d"
+        },
+        "5_5_warning_strategies": {
+          "title": "5.5 Warning and Degradation Strategies",
+          "prompt": "Describe driver warning strategies and degradation approaches. Purpose: reduce exposure time or increase controllability.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.f,g"
+        },
+        "5_6_timing": {
+          "title": "5.6 Timing Requirements",
+          "prompt": "Specify FTTI for each safety-critical function and corresponding fault handling time intervals at functional level.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.2.3.h"
+        }
+      }
+    },
+    "6_asil_decomposition": {
+      "title": "6. ASIL Decomposition (if applicable)",
+      "prompt": "If ASIL decomposition has been applied to any FSRs, document: original requirement with ASIL, decomposed requirements with ASILs, independence justification, rationale for decomposition.",
+      "iso_clause": "ISO 26262-9:2018, Clause 5"
+    },
+    "7_preliminary_technical": {
+      "title": "7. Preliminary Technical Considerations",
+      "note": "This section provides a BRIDGE to Technical Safety Concept, not detailed TSR specification.",
+      "subsections": {
+        "7_1_hw_sw_notes": {
+          "title": "7.1 Hardware vs Software Realization Notes",
+          "prompt": "For each allocated FSR, provide brief notes on whether hardware or software realization is anticipated and why. These are preliminary observations to inform TSC phase, NOT detailed technical requirements."
+        },
+        "7_2_interfaces_preliminary": {
+          "title": "7.2 Interface Considerations",
+          "prompt": "Note key interface considerations at functional level that will need detailed specification in TSC (e.g., 'High-speed communication required between X and Y')."
+        },
+        "7_3_tsc_inputs": {
+          "title": "7.3 Inputs to Technical Safety Concept Phase",
+          "prompt": "Summarize key information to be carried forward to TSC development: FSRs requiring detailed hardware specification, FSRs requiring software algorithms, critical timing constraints, independence requirements for redundant channels."
+        }
+      }
+    },
+    "8_verification_strategy": {
+      "title": "8. Verification Strategy",
+      "subsections": {
+        "8_1_fsc_verification": {
+          "title": "8.1 FSC Verification Approach",
+          "prompt": "Describe verification approach for FSC completeness and consistency per ISO 26262-3:2018, 7.4.4. Methods: reviews, walkthroughs, traceability analysis.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.4"
+        },
+        "8_2_validation_criteria": {
+          "title": "8.2 Safety Validation Criteria",
+          "prompt": "Specify acceptance criteria for safety validation of the item based on FSRs and safety goals per ISO 26262-3:2018, 7.4.3.",
+          "iso_clause": "ISO 26262-3:2018, Clause 7.4.3"
+        }
+      }
+    },
+    "9_traceability": {
+      "title": "9. Traceability",
+      "prompt": "Include traceability matrix: Safety Goal → FSR → Allocated Component → Functional Mechanism. Bi-directional traceability per ISO 26262-8.",
+      "iso_clause": "ISO 26262-8:2018, Clause 6.4.3"
+    },
+    "10_next_phase": {
+      "title": "10. Next Phase: Technical Safety Concept",
+      "prompt": "State that this FSC completes ISO 26262-3, Clause 7 requirements. The next development phase is Technical Safety Concept (ISO 26262-4, Clause 6) which will: derive Technical Safety Requirements (TSRs) from FSRs, specify detailed hardware and software requirements, define hardware-software interface, establish hardware architecture metrics targets. List FSRs that require detailed technical specification in TSC."
+    },
+    "11_approvals": {
+      "title": "11. Approvals",
+      "prompt": "Table with columns: Role, Name, Signature, Date. Rows: Safety Manager, System Engineer, Project Manager. Leave as placeholders for manual completion.",
+      "note": "FSC must be approved before proceeding to Technical Safety Concept phase."
+    }
+  },
+
+  "document_notes": {
+    "scope": "This template is for Functional Safety Concept per ISO 26262-3:2018, Clause 7. It does NOT include Technical Safety Requirements (TSRs) which belong in Technical Safety Concept (ISO 26262-4).",
+    "level": "FUNCTIONAL level - specifies WHAT needs to be achieved, not HOW to implement it technically.",
+    "next_phase": "After FSC approval, proceed to Technical Safety Concept (ISO 26262-4, Clause 6) for detailed technical specification."
+  }
+}
