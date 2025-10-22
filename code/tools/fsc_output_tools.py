@@ -18,6 +18,64 @@ tools_folder = os.path.dirname(current_file)
 code_folder = os.path.dirname(tools_folder)
 plugin_folder = os.path.dirname(code_folder)
 
+
+@tool(
+    return_direct=True,
+    examples=[
+        "export FSRs to excel",
+        "save FSRs as spreadsheet",
+        "create FSR excel file"
+    ]
+)
+def export_fsrs_to_excel(tool_input, cat):
+    """
+    Export FSRs to standalone Excel file immediately after derivation.
+    Can be called BEFORE allocation step.
+    
+    Creates Excel with sheets:
+    - FSR Listing
+    - FSRs by Safety Goal
+    - FSRs by ASIL  
+    - FSRs by Type
+    - Statistics
+    """
+    from ..generators.Functional_Safety_Concept.fsr_excel_generator import generate_fsr_excel
+    
+    fsrs_data = cat.working_memory.get("fsc_functional_requirements", [])
+    goals_data = cat.working_memory.get("fsc_safety_goals", [])
+    system_name = cat.working_memory.get("system_name", "System")
+    
+    if not fsrs_data:
+        return "❌ No FSRs available. Derive FSRs first."
+    
+    # Generate workbook
+    wb = generate_fsr_excel(fsrs_data, goals_data, system_name)
+    
+    # Save workbook
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSR")
+    os.makedirs(output_dir, exist_ok=True)
+        
+    safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
+            for c in system_name).replace(" ", "_")
+        
+    filename = f"FSC_{safe_name}_{timestamp}.xlsx"
+    filepath = os.path.join(output_dir, filename)
+        
+    wb.save(filepath)
+
+    
+    return f"""✅ **FSRs Excel file generated!** 
+    
+   **File:** `{filename}`
+    **Location:** `generated_documents/06_FSRs/`
+    
+    **Next Steps:** 
+    1. 📖 Review the FSRs
+    2. ✍️ Complete the approvals section
+    """
+
+
 @tool(
     return_direct=True,
     examples=[

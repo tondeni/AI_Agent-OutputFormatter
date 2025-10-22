@@ -38,6 +38,7 @@ def generate_fsr_excel(fsrs_data, goals_data, system_name):
     _create_traceability_sheet(ws_traceability, fsrs_data, goals_data, system_name)
     _create_statistics_sheet(ws_statistics, fsrs_data, system_name)
     
+    # cat.working_memory.last_operation = "strategy_development"
     return wb
 
 
