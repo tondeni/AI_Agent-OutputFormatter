@@ -53,13 +53,13 @@ def export_fsrs_to_excel(tool_input, cat):
     
     # Save workbook
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSR")
+    output_dir = os.path.join(plugin_folder, "generated_documents", "06_FSRs")
     os.makedirs(output_dir, exist_ok=True)
         
     safe_name = "".join(c if c.isalnum() or c in "._- " else "_" 
             for c in system_name).replace(" ", "_")
         
-    filename = f"FSC_{safe_name}_{timestamp}.xlsx"
+    filename = f"FSRs_{safe_name}_{timestamp}.xlsx"
     filepath = os.path.join(output_dir, filename)
         
     wb.save(filepath)
@@ -68,9 +68,9 @@ def export_fsrs_to_excel(tool_input, cat):
     return f"""✅ **FSRs Excel file generated!** 
     
    **File:** `{filename}`
-    **Location:** `generated_documents/06_FSRs/`
+   **Location:** `generated_documents/06_FSRs/`
     
-    **Next Steps:** 
+    **Next steps** 
     1. 📖 Review the FSRs
     2. ✍️ Complete the approvals section
     """
